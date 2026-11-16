@@ -1,0 +1,139 @@
+# PRJNA838778 single-study analysis configuration
+# Do NOT merge with other BioProjects in this pipeline.
+# Schema matches PRJNA1016449 for later meta-analysis pooling.
+
+project:
+  bioproject: PRJNA838778
+  title: "Gut microbiota in children with metabolic syndrome"
+  publication:
+    citation: "Zhou et al. Microbiol Spectr 2023"
+    doi: "10.1128/spectrum.03771-22"
+    pmid: "36794949"
+    pmcid: "PMC10101147"
+  organization: "Central South University / Hunan Children's Hospital"
+
+paths:
+  root: "."
+  metadata: "00_metadata/sample_metadata.tsv"
+  qiime_metadata: "00_metadata/qiime_metadata.tsv"
+  manifest: "00_metadata/fastq_manifest.tsv"
+  raw_data: "01_raw_data/fastq"
+  classifier: "ref/silva-138-99-nb-classifier.qza"
+
+sequencing:
+  platform: "Illumina NovaSeq 6000 (Novogene; paper also cites MiSeq)"
+  layout: single
+  layout_note: >
+    SRA/ENA mark library_layout=PAIRED but deposited files are single
+    FASTQ per run (~400 bp). User-confirmed single-end analysis.
+    Primers already absent from deposited reads (no front primer match).
+  target_region: V4
+  forward_primer_name: "515F"
+  forward_primer: "GTGCCAGCMGCCGCGGTAA"
+  reverse_primer_name: "806R"
+  reverse_primer: "GGACTACVSGGGTATCTAAT"
+  read_length_nominal_bp: 400
+  notes: >
+    Paper: V4 F515/R806. Deposited reads appear primer-trimmed / merged-like
+    with median length ~404 bp and high quality across the read.
+
+clinical_definitions:
+  mets_definition: >
+    Pediatric MetS per Pediatrics Branch of the Chinese Medical Society Guidelines
+    (Zhou et al. 2023).
+  obesity_definition: "BMI-for-age and BMI-for-sex national standards."
+  control_definition: >
+    Control = ALL samples that are not MetS (sample_alias Control* / Dx=non_MetS).
+    Coding: mets_status MetS if MS*; else mets_status Control (n=31).
+  primary_contrast: "MetS vs Control (all non-MetS samples)"
+  paper_counts: "23 MS + 31 non-MetS controls (54 total); matches BioSample aliases."
+
+metadata_availability:
+  available: [sample_alias, mets_status, Dx, geo_loc_name, host, instrument]
+  unavailable: [age_years, sex, BMI, antibiotics_detailed, medications, diet, HDL, triglycerides, HbA1c]
+  missing_coded_as: ["missing", "not collected", "not applicable"]
+  notes: >
+    Per-sample age/sex/BMI not deposited in BioSample; paper reports group summaries only.
+    Adjusted DA (age+sex+BMI) therefore skipped / expected to be unavailable.
+
+qc:
+  fastqc: true
+  multiqc: false
+  min_reads_raw_warn: 10000
+  dada2_min_nonchim_reads: 1000
+  report_failures: true
+
+preprocessing:
+  method: "qiime2 cutadapt trim-single (pass-through if primers already removed)"
+  front: "GTGCCAGCMGCCGCGGTAA"
+  adapter_3prime: "ATTAGATACCCSBGTAGTCC"  # RC of 806R consensus GGACTACVSGGGTATCTAAT
+  error_rate: 0.15
+  indels: true
+  match_adapter_wildcards: true
+  match_read_wildcards: true
+  minimum_length: 50
+  discard_untrimmed: false
+
+dada2:
+  method: "qiime2 dada2 denoise-single"
+  trunc_len: 400
+  trim_left: 0
+  max_ee: 2
+  trunc_q: 2
+  pooling_method: independent
+  chimera_method: consensus
+
+taxonomy:
+  database: SILVA
+  version: "138"
+  identity: "99%"
+  classifier: "ref/silva-138-99-nb-classifier.qza"
+  confidence: 0.7
+  note: "Fixed SILVA 138 for cross-study consistency."
+
+filtering:
+  remove_mitochondria: true
+  remove_chloroplast: true
+  remove_unassigned_phylum: false
+  min_prevalence_fraction_asv: 0.05
+  min_total_asv_reads: 10
+  genus_min_prevalence: 0.10
+  keep_raw_and_filtered: true
+
+phylogeny:
+  method: "QIIME2 align-to-tree-mafft-fasttree"
+
+diversity:
+  rarefaction_depth: null
+  alpha_metrics: [observed_features, shannon, simpson]
+  beta_metrics: [braycurtis, jaccard, unweighted_unifrac, weighted_unifrac]
+  permanova_permutations: 999
+  primary_variable: mets_status
+  covariates_candidate: []
+
+differential_abundance:
+  primary_method: ANCOM-BC2
+  secondary_method: none
+  taxonomic_level_primary: genus
+  fdr_method: BH
+  fdr_threshold: 0.10
+  suggestive_threshold: 0.20
+  prevalence_threshold: 0.10
+  primary_formula_unadjusted: "mets_status"
+  primary_formula_adjusted: "skipped_no_covariates_in_BioSample"
+  reference_level: "Control"
+  effect_size_definition: >
+    ANCOM-BC2 log fold-change for MetS relative to Control, where Control =
+    all non-MetS samples, with SE and 95% CI.
+
+sensitivity:
+  prevalence_thresholds: [0.05, 0.10, 0.20]
+  compare_adjusted: false
+
+functional_prediction:
+  enabled: false
+  exploratory_only: true
+
+software_env:
+  qiime2_env: qiime2-amplicon-2024.10
+  r_env: bio

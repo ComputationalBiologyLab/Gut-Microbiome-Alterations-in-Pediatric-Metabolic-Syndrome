@@ -1,0 +1,150 @@
+# PRJNA1016449 single-study analysis configuration
+
+project:
+  bioproject: PRJNA1016449
+  sra_study: SRP460279
+  title: "Gut Microbiota Profiles of Children with Obesity or Metabolic Syndrome"
+  publication:
+    citation: "Gathungu et al. Obesities 2023, 3, 253–264"
+    doi: "10.3390/obesities3030021"
+    pmid: null
+  organization: "University of Colorado School of Medicine / Stony Brook University"
+
+paths:
+  root: "."
+  metadata: "00_metadata/sample_metadata.tsv"
+  qiime_metadata: "00_metadata/qiime_metadata.tsv"
+  manifest: "00_metadata/fastq_manifest.tsv"
+  raw_data: "01_raw_data"
+  classifier: "ref/silva-138-99-nb-classifier.qza"
+
+sequencing:
+  platform: "Illumina MiSeq"
+  reagent_kit: "600-cycle MiSeq Reagent Kit v3"
+  layout: paired
+  target_region: V3V4
+  forward_primer_name: "338F"
+  forward_primer: "ACTCCTACGGGAGGCAGCAG"
+  reverse_primer_name: "806R"
+  reverse_primer: "GGACTACHVGGGTWTCTAAT"
+  read_length_nominal_bp: 300
+  notes: >
+    Barcoded primers; ~8–15 nt sample barcode/linker observed 5' of primer
+    motifs in demultiplexed SRA FASTQs. Primers removed with cutadapt
+    (non-anchored front adapters) before DADA2.
+
+clinical_definitions:
+  mets_definition: >
+    Pediatric MetS per study: weight >95th percentile for age PLUS
+    elevated systolic BP, elevated triglycerides, impaired fasting glucose,
+    or hyperinsulinemia (Gathungu et al. 2023, citing Magge et al. Pediatrics 2017).
+  obesity_definition: "Weight >95th percentile for age."
+  control_definition: >
+    Children without MetS are used as the comparator group
+    for the MetS vs control contrast and for meta-analysis effect sizes.
+    Coding: mets_status Control = non-MetS comparator (n=34).
+  primary_contrast: "MetS vs Control (non-MetS comparators)"
+  secondary_contrast: "BMI-B (BMI>=30) vs BMI-A (BMI<30)"
+
+metadata_availability:
+  available: [age_years, sex, ethnicity, BMI, BMIGroup, SBPI, DBPI, Dx]
+  unavailable: [antibiotics_detailed, medications, T2DM_label, diet_nutrients_per_sample, HDL, triglycerides_raw, HbA1c]
+  missing_coded_as: ["missing", "not collected", "not applicable"]
+  notes: >
+    Triglycerides, HDL, HbA1c reported in paper Table 1 but not deposited per-sample
+    in BioSample. Diet logs exist for a subset in the paper but are not in SRA metadata.
+
+qc:
+  fastqc: true
+  multiqc: false  # skipped — FastQC alone is sufficient (user request)
+  min_reads_raw_warn: 10000
+  # Samples are NOT removed solely for failing soft warnings; hard failures documented.
+  dada2_min_nonchim_reads: 1000
+  report_failures: true
+
+preprocessing:
+  method: "qiime2 cutadapt trim-paired"
+  front_f: "ACTCCTACGGGAGGCAGCAG"
+  front_r: "GGACTACHVGGGTWTCTAAT"
+  error_rate: 0.15
+  indels: true
+  match_adapter_wildcards: true
+  match_read_wildcards: true
+  minimum_length: 50
+  discard_untrimmed: false
+
+dada2:
+  # truncLen chosen after inspecting quality profiles (see 04_dada2/quality_profiles.pdf)
+  # Defaults below are conservative for MiSeq 2x300 V3V4 after primer removal.
+  trunc_len_f: 260
+  trunc_len_r: 200
+  trim_left_f: 0
+  trim_left_r: 0
+  max_ee_f: 2.0
+  max_ee_r: 2.0
+  trunc_q: 2
+  pooling_method: independent
+  chimera_method: consensus
+  min_fold_parent_over_abundance: 1.0
+  n_threads: 4
+
+taxonomy:
+  database: "SILVA"
+  version: "138"
+  identity: "99%"
+  classifier: "Naive Bayes (q2-feature-classifier classify-sklearn)"
+  confidence: 0.7
+  note: "Fixed SILVA 138 for cross-study consistency."
+
+filtering:
+  remove_mitochondria: true
+  remove_chloroplast: true
+  remove_unassigned_phylum: false
+  min_prevalence_fraction_asv: 0.05   # ASV in >=5% samples for filtered table
+  min_total_asv_reads: 10
+  genus_min_prevalence: 0.10         # primary DA prevalence filter
+  keep_raw_and_filtered: true
+
+phylogeny:
+  method: "QIIME2 align-to-tree-mafft-fasttree"
+  alignment: MAFFT
+  tree: FastTree
+
+diversity:
+  rarefaction_depth: null  # set after DADA2 to min(median*0.2-like) or explicit value
+  alpha_metrics: [observed_features, shannon, simpson]
+  beta_metrics: [braycurtis, jaccard, unweighted_unifrac, weighted_unifrac]
+  permanova_permutations: 999
+  primary_variable: mets_status
+  covariates_candidate: [age_years, sex, BMI, ethnicity, BMIGroup]
+
+differential_abundance:
+  primary_method: ANCOM-BC2
+  secondary_method: none  # single DA method only (user request)
+  taxonomic_level_primary: genus
+  exploratory_levels: [family, species]
+  fdr_method: BH
+  fdr_threshold: 0.10
+  suggestive_threshold: 0.10
+  prevalence_threshold: 0.10
+  primary_formula_unadjusted: "mets_status"
+  primary_formula_adjusted: "mets_status + age_years + sex + BMI"
+  reference_level: "Control"
+  effect_size_definition: >
+    ANCOM-BC2 log fold-change (natural log bias-corrected abundance ratio)
+    for MetS relative to Control, where Control = non-MetS comparator group,
+    with SE and 95% CI.
+
+sensitivity:
+  prevalence_thresholds: [0.05, 0.10, 0.20]
+  compare_family_level: true
+  compare_adjusted: true
+
+functional_prediction:
+  enabled: true
+  method: "PICRUSt2 if environment available; otherwise skip with documentation"
+  exploratory_only: true
+
+software_env:
+  qiime2_env: qiime2-amplicon-2024.10
+  r_env: bio

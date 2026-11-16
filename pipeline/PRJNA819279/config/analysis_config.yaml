@@ -1,0 +1,136 @@
+# PRJNA819279 single-study analysis configuration
+# Do NOT merge with other BioProjects in this pipeline.
+# Schema matches PRJNA1016449 / PRJNA838778 for later meta-analysis pooling.
+# T2DM samples are EXCLUDED from all analysis steps.
+
+project:
+  bioproject: PRJNA819279
+  sra_study: SRP365648
+  title: "Gut microbiota in Mexican pediatric MetS and T2DM (T2DM excluded here)"
+  publication:
+    citation: "Carrizales-Sánchez et al. BMC Pediatr 2023"
+    doi: "10.1186/s12887-023-03983-6"
+    pmid: null
+  organization: "Tecnologico de Monterrey"
+
+paths:
+  root: "."
+  metadata: "00_metadata/sample_metadata.tsv"
+  qiime_metadata: "00_metadata/qiime_metadata.tsv"
+  manifest: "00_metadata/fastq_manifest.tsv"
+  raw_data: "01_raw_data"
+  classifier: "ref/silva-138-99-nb-classifier.qza"
+
+sequencing:
+  platform: "Illumina MiSeq"
+  reagent_kit: "MiSeq Reagent Kit V3 (600 cycles)"
+  layout: paired
+  target_region: V3V4
+  forward_primer_name: "341F"
+  forward_primer: "CCTACGGGNGGCWGCAG"
+  reverse_primer_name: "805R"
+  reverse_primer: "GACTACHVGGGTATCTAATCC"
+  read_length_nominal_bp: 300
+  notes: >
+    Illumina 16S Metagenomic Sequencing Library Preparation (V3–V4).
+    T2DM arm excluded from this analysis folder.
+
+clinical_definitions:
+  mets_definition: >
+    Pediatric MetS with ≥3 Cook et al. criteria (Carrizales-Sánchez et al. 2023).
+  control_definition: >
+    Pediatric comparators without MetS or T2DM (LibraryName Control*).
+    Coding: mets_status Control (n=20).
+  primary_contrast: "MetS vs Control (non-MetS)"
+  t2dm_policy: "EXCLUDED from all analysis steps (n=21 not used)"
+  paper_counts: "Paper: MetS=25, T2DM=21, Control=20; this analysis: MetS=25 + Control=20 = 45"
+
+metadata_availability:
+  available: [library_name, SampleName, mets_status, clinical_group, geo_loc_name, host, instrument]
+  unavailable: [age_years, sex, BMI, antibiotics_detailed, medications, diet, HDL, triglycerides, HbA1c]
+  missing_coded_as: ["missing", "not collected", "not applicable"]
+
+qc:
+  fastqc: true
+  multiqc: false
+  min_reads_raw_warn: 10000
+  dada2_min_nonchim_reads: 1000
+  report_failures: true
+
+preprocessing:
+  method: "qiime2 cutadapt trim-paired"
+  front_f: "CCTACGGGNGGCWGCAG"
+  front_r: "GACTACHVGGGTATCTAATCC"
+  error_rate: 0.15
+  indels: true
+  match_adapter_wildcards: true
+  match_read_wildcards: true
+  minimum_length: 50
+  discard_untrimmed: false
+
+dada2:
+  method: "qiime2 dada2 denoise-paired"
+  trunc_len_f: 260
+  trunc_len_r: 200
+  trim_left_f: 0
+  trim_left_r: 0
+  max_ee_f: 2.0
+  max_ee_r: 2.0
+  trunc_q: 2
+  pooling_method: independent
+  chimera_method: consensus
+
+taxonomy:
+  database: SILVA
+  version: "138"
+  identity: "99%"
+  classifier: "ref/silva-138-99-nb-classifier.qza"
+  confidence: 0.7
+  note: "Fixed SILVA 138 for cross-study consistency."
+
+filtering:
+  remove_mitochondria: true
+  remove_chloroplast: true
+  remove_unassigned_phylum: false
+  min_prevalence_fraction_asv: 0.05
+  min_total_asv_reads: 10
+  genus_min_prevalence: 0.10
+  keep_raw_and_filtered: true
+
+phylogeny:
+  method: "QIIME2 align-to-tree-mafft-fasttree"
+
+diversity:
+  rarefaction_depth: null
+  alpha_metrics: [observed_features, shannon, simpson]
+  beta_metrics: [braycurtis, jaccard, unweighted_unifrac, weighted_unifrac]
+  permanova_permutations: 999
+  primary_variable: mets_status
+  covariates_candidate: []
+
+differential_abundance:
+  primary_method: ANCOM-BC2
+  secondary_method: none
+  taxonomic_level_primary: genus
+  fdr_method: BH
+  fdr_threshold: 0.10
+  suggestive_threshold: 0.20
+  prevalence_threshold: 0.10
+  primary_formula_unadjusted: "mets_status"
+  primary_formula_adjusted: "skipped_no_covariates_in_BioSample"
+  reference_level: "Control"
+  effect_size_definition: >
+    ANCOM-BC2 log fold-change for MetS relative to Control (non-MetS),
+    with SE and 95% CI. T2DM samples excluded.
+
+sensitivity:
+  prevalence_thresholds: [0.05, 0.10, 0.20]
+  compare_adjusted: false
+
+functional_prediction:
+  enabled: false
+  exploratory_only: true
+
+software_env:
+  qiime2_env: qiime2-amplicon-2024.10
+  r_env: bio

@@ -1,0 +1,33 @@
+name: prjna1016449-16s
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - fastqc
+  - multiqc
+  - cutadapt
+  - pandoc
+  # Prefer using existing env qiime2-amplicon-2024.10 for QIIME2/DADA2
+  # and env bio for R statistical analysis.
+  - r-base>=4.3
+  - r-tidyverse
+  - r-yaml
+  - r-vegan
+  - r-ape
+  - r-ggplot2
+  - r-ggpubr
+  - r-pheatmap
+  - r-optparse
+  - bioconductor-phyloseq
+  - bioconductor-deseq2
+  - bioconductor-ancombc
+  - bioconductor-biomformat
+  - bioconductor-biostrings
+notes: |
+  Primary execution uses:
+    - conda env: qiime2-amplicon-2024.10  (import, cutadapt, dada2, taxonomy, phylogeny, diversity)
+    - conda env: bio (+ Bioconductor ANCOMBC, Maaslin2) for DA / figures / tables
+  Install Maaslin2 in R if missing:
+    BiocManager::install(c('ANCOMBC','Maaslin2'))
