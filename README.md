@@ -1,6 +1,5 @@
 # Gut microbiome alterations in pediatric metabolic syndrome: harmonized multi-cohort reproducibility analysis
 
-Code for the analyses in *Gut Microbiome Alterations in Pediatric Metabolic Syndrome: A Harmonized Multi-Cohort Reproducibility Analysis* (Applied Microbiology).
 
 Three public pediatric fecal 16S rRNA datasets (PRJNA1016449, USA; PRJNA838778, China; PRJNA819279, Mexico) are reprocessed with one pipeline, tested for differential abundance with ANCOM-BC2, pooled by random-effects meta-analysis and evaluated with a pre-specified reproducibility classification. Raw reads are available from the NCBI Sequence Read Archive under the BioProject accessions above. Derived outputs are in the Supplementary Tables of the article.
 
